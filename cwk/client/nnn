@@ -1,0 +1,136 @@
+package server;
+
+import java.net.*;
+import java.io.*;
+import java.util.concurrent.*;
+
+import client.ClientHandler; // ✅ Import ClientHandler from the client package
+
+public class Server {
+    private static ConcurrentHashMap<String, Integer> votes = new ConcurrentHashMap<>();
+     public static void main ( String [] args ) throws IOException {
+     ServerSocket serverSocket = null ;
+     ExecutorService service = null ;
+    
+     if (args.length < 2) {
+        System .err.println("At least two voting options must be given.");
+        System.exit(1);
+    }
+
+    votes.clear();
+
+    // lect 10
+    // synchronized( System.out ) {
+    //     System.out.print("Socket host: " + so.getInetAddress());
+    //     System.out.print(" on port: " + so.getPort());
+    //     System.out.println();
+    //     }
+
+     try {
+     serverSocket = new ServerSocket (7777) ;
+     System.out.println("The server is running on port 7777:");
+     service = Executors . newCachedThreadPool () ;
+     } catch ( IOException e ) {
+        System . err . println ("Cannot listen on port 7777.") ;
+        System . exit (1) ;
+        }
+     
+    
+     while ( true )
+     {
+     Socket client = serverSocket . accept () ;
+     service . submit ( new ClientHandler ( client ) ) ;
+     }
+    }
+
+
+
+
+
+
+// lect 8
+private static final int WAITING = 0;
+private static final int VOTING = 1;
+private static final int LISTING = 2;
+private static int state = WAITING;
+
+private static String processInput(String theInput) {
+    String theOutput = null;
+
+    if (state == WAITING) {
+        theOutput = "Welcome! You can vote using 'vote <option>' or check results with 'list'.";
+        state = VOTING;
+    } 
+    else if (state == VOTING) {
+        if (theInput.startsWith("vote ")) {
+            String option = theInput.substring(5).trim().toLowerCase();
+
+            if (!votes.containsKey(option)) {
+                theOutput = "❌ Error: '" + option + "' is not a valid voting option.";
+            } else {
+                // Thread-safe vote update
+                synchronized (votes) {
+                    votes.put(option, votes.get(option) + 1);
+                }
+                theOutput = "✅ Vote for '" + option + "' counted!";
+                state = WAITING; // Reset state
+            }
+        } 
+        else if (theInput.equals("list")) {
+            theOutput = "📋 Fetching vote results...";
+            state = LISTING;
+        } 
+        else {
+            theOutput = "❌ Invalid request. Use 'vote <option>' or 'list'.";
+        }
+    } 
+    else if (state == LISTING) {
+        StringBuilder result = new StringBuilder();
+        for (String key : votes.keySet()) {
+            result.append(key).append(": ").append(votes.get(key)).append(" votes\n");
+        }
+        theOutput = result.toString();
+        state = WAITING;
+    }
+
+    return theOutput;
+
+
+
+    }
+}
+
+public class KKClientHandler extends Thread {
+    2 public void run () {
+    3 try {
+    4 PrintWriter out = new PrintWriter (socket . getOutputStream () ,true );
+    6 BufferedReader in = new BufferedReader (new InputStreamReader (socket . getInputStream ()));
+    9 String inputLine , outputLine ;
+    10 Voting v = new Voting ();
+    11 outputLine = kkp . processInput ( null );
+    12 out . println ( outputLine );
+    13
+    14 while (( inputLine = in. readLine ()) != null ) {
+    15 // As per the basic version
+    16 }
+    17 out . close ();
+    18 in. close ();
+    19 socket . close ();
+    20 } catch ( IOException e) { ... }
+    21 }
+    
+
+    private static void logRequest(String clientIP, String request) {
+        try {
+            File logFile = new File("log.txt");
+            if (!logFile.exists()) logFile.createNewFile(); // Create if it doesn't exist
+    
+            BufferedWriter writer = new BufferedWriter(new FileWriter(logFile, true));
+            String timestamp = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+            writer.write(timestamp + " | " + clientIP + " | " + request + "\n");
+            writer.close();
+        } catch (IOException e) {
+            System.err.println("❌ Error writing to log file.");
+        }
+    }
+    
