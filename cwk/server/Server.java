@@ -1,12 +1,9 @@
-package server;
-
 import java.io.*;
 import java.net.*;
 import java.util.concurrent.*;
 
 import java.util.Date;
 
-// lect 11 executor server model
 public class Server {
     // hashmapping to store votes thread-safely
     private static ConcurrentHashMap<String, Integer> votes = new ConcurrentHashMap<>();
@@ -51,7 +48,7 @@ public class Server {
         }
     }
 
-    // lect 10 kkc handler
+    // client-handler
     private static class HandleClient extends Thread {
         private Socket socket;
 
@@ -65,7 +62,7 @@ public class Server {
                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
                 BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-                // read, log, process, then respond to client request and exit loop
+                // protocol to read, log, process, then respond to client request and exit loop
                 String inputLine, outputLine;
                 while ((inputLine = in.readLine()) != null) {
                     logRequest(socket.getInetAddress().getHostAddress(), inputLine);
@@ -90,36 +87,57 @@ public class Server {
                 e.printStackTrace();
             }
         }
-    }
 
-    // some methods in this class is inspired by
-    // https://stackoverflow.com/questions/51650024/java-client-server-client-with-synchronised-thread
-    private static String processInput(Socket clientSocket, String input) {
-        // take the arguments after 'vote '
-        if (input.startsWith("vote ")) {
-            String option = input.substring(5).trim().toLowerCase();
-            // validate voting option
-            if (!votes.containsKey(option)) {
-                return "Cannot find option '" + option + "'.";
-            }
-            // thread-safe incrementation of votes
-            synchronized (votes) {
-                votes.put(option, votes.get(option) + 1);
-            }
-            return "Incremented the number of votes for '" + option + "'.";
+        // possible client states
+        private static final int VOTING = 0;
+        private static final int LISTING = 1;
 
-            // if 'list' argument is requested, loop through all options and return them
-        } else if (input.equals("list")) {
-            StringBuilder result = new StringBuilder();
-            for (String key : votes.keySet()) {
-                result.append(key).append(": ").append(votes.get(key)).append(" votes\n");
+        private int state = VOTING;
+
+        // process client requests (inputs)
+        private String processInput(Socket clientSocket, String theInput) {
+            String theOutput = null;
+
+            if (state == VOTING) {
+                // only look at the <option> when client votes
+                if (theInput.startsWith("vote ")) {
+                    String option = theInput.substring(5).trim().toLowerCase();
+
+                    // thread-safe incrementation of votes
+                    if (votes.containsKey(option)) {
+                        synchronized (votes) {
+                            votes.put(option, votes.get(option) + 1);
+                        }
+                        theOutput = "Incremented the number of votes for '" + option + "'.";
+                    } else {
+                        theOutput = "Cannot find option '" + option + "'.";
+                    }
+
+                    // handle list request
+                } else if (theInput.equals("list")) {
+                    state = LISTING;
+                    return processInput(clientSocket, "");
+                    // error message for wrong entry
+                } else {
+                    theOutput = "Bad request. Only input 'Java Client vote <option>' or 'Java Client list'.";
+                }
+
+                // show votes count in listing state
+            } else if (state == LISTING) {
+                StringBuilder result = new StringBuilder();
+                // loop through all voting options and return all with their vote counts to
+                // result
+                for (String key : votes.keySet()) {
+                    result.append(key).append(": ").append(votes.get(key)).append(" votes\n");
+                }
+                theOutput = result.toString().trim();
             }
-            return result.toString().trim();
-        } else {
-            return "Bad request. Only input 'vote <option>' or 'list'.";
+
+            return theOutput;
         }
     }
 
+    // record all client requests to log.txt
     private static void logRequest(String clientIP, String request) {
         try {
             // create log.txt if it doesnt exist in the server directory
@@ -129,8 +147,7 @@ public class Server {
 
             // write request details to the file
             BufferedWriter writer = new BufferedWriter(new FileWriter(logFile, true));
-            writer.write(new java.text.SimpleDateFormat("dd-MM-yyyy | HH:mm:ss").format(new Date()) + " | " + clientIP
-                    + " | " + request + "\n");
+            writer.write(new java.text.SimpleDateFormat("dd-MM-yyyy | HH:mm:ss").format(new Date()) + " | " + clientIP+ " | " + request + "\n");
             writer.close();
         } catch (IOException e) {
             System.err.println("An error occured when writing to log file.");

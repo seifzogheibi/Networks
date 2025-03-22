@@ -1,5 +1,3 @@
-package client;
-
 import java.io.*;
 import java.net.*;
 
@@ -19,7 +17,7 @@ public class Client {
             socketInput = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             socketOutput = new PrintWriter(socket.getOutputStream(), true);
 
-            // error statements
+        // error statements
         } catch (UnknownHostException e) {
             System.err.println("Unknown host.\n");
             System.exit(1);
@@ -55,6 +53,7 @@ public class Client {
             socket.close();
             System.exit(0);
 
+        // error message
         } catch (IOException e) {
             System.err.println("Cannot connect from server.");
             System.exit(1);
